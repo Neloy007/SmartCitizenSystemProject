@@ -30,14 +30,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.smartcitizensystem.ui.presentation.auth.biometric.BiometricPromptManager
 import com.example.smartcitizensystem.ui.presentation.auth.components.InputField
 import com.example.smartcitizensystem.ui.presentation.auth.components.PasswordInputField
 import com.example.smartcitizensystem.ui.presentation.auth.dao.BiometricResult
 import kotlinx.coroutines.flow.collectLatest
+import android.util.Log
+
+private const val TAG = "LoginScreen"
 
 @Composable
 fun LoginScreen(
+    viewModel: LoginViewModel = hiltViewModel(),
     modifier: Modifier = Modifier,
     onLoginClick: () -> Unit = {},
     onSignupClick: () -> Unit = {},
@@ -45,7 +50,16 @@ fun LoginScreen(
 ) {
     val context = LocalContext.current
     val activity = context as? AppCompatActivity
-    val promptManager = remember { activity?.let { BiometricPromptManager(it) } }
+    val loginState = viewModel.loginState.value
+
+    val promptManager = remember {
+        try {
+            activity?.let { BiometricPromptManager(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create BiometricPromptManager", e)
+            null
+        }
+    }
 
     val enrollLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -54,40 +68,90 @@ fun LoginScreen(
     var identity by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var biometricResultMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    var isAuthenticating by rememberSaveable { mutableStateOf(false) }
+    var hasNavigated by rememberSaveable { mutableStateOf(false) }
+
+    // Handle login state changes - with safe navigation
+    LaunchedEffect(loginState) {
+        when (loginState) {
+            is LoginUiState.Success -> {
+                Log.d(TAG, "Login successful, navigating to home")
+                if (!hasNavigated) {
+                    hasNavigated = true
+                    onLoginClick()
+                    viewModel.resetState()
+                }
+            }
+            is LoginUiState.Error -> {
+                Log.e(TAG, "Login error: ${loginState.message}")
+                // Error is displayed in UI
+            }
+            else -> Unit
+        }
+    }
+
+    // Reset navigation flag when state changes to Idle
+    LaunchedEffect(loginState) {
+        if (loginState is LoginUiState.Idle) {
+            hasNavigated = false
+        }
+    }
 
     // Collect biometric results
     LaunchedEffect(promptManager) {
-        promptManager?.promptResults?.collectLatest { result ->
-            when (result) {
-                is BiometricResult.AuthenticationNotSet -> {
-                    biometricResultMessage = "Authentication not set"
-                    if (Build.VERSION.SDK_INT >= 30) {
-                        val enrollIntent = Intent(Settings.ACTION_BIOMETRIC_ENROLL).apply {
-                            putExtra(
-                                Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
-                                BIOMETRIC_STRONG or DEVICE_CREDENTIAL
-                            )
+        try {
+            promptManager?.promptResults?.collectLatest { result ->
+                when (result) {
+                    is BiometricResult.AuthenticationNotSet -> {
+                        biometricResultMessage = "Authentication not set. Please set up biometric."
+                        isAuthenticating = false
+                        if (Build.VERSION.SDK_INT >= 30) {
+                            try {
+                                val enrollIntent = Intent(Settings.ACTION_BIOMETRIC_ENROLL).apply {
+                                    putExtra(
+                                        Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
+                                        BIOMETRIC_STRONG or DEVICE_CREDENTIAL
+                                    )
+                                }
+                                enrollLauncher.launch(enrollIntent)
+                            } catch (e: Exception) {
+                                biometricResultMessage = "Cannot open biometric settings"
+                            }
                         }
-                        enrollLauncher.launch(enrollIntent)
+                    }
+                    is BiometricResult.AuthenticationSuccess -> {
+                        biometricResultMessage = "Authentication successful! ✅"
+                        isAuthenticating = false
+                        viewModel.onBiometricSuccess()
+                        if (!hasNavigated) {
+                            hasNavigated = true
+                            onLoginClick()
+                        }
+                    }
+                    is BiometricResult.AuthenticationError -> {
+                        biometricResultMessage = "Error: ${result.error}"
+                        isAuthenticating = false
+                        viewModel.onBiometricError(result.error)
+                    }
+                    is BiometricResult.AuthenticationFailed -> {
+                        biometricResultMessage = "Authentication failed. Please try again."
+                        isAuthenticating = false
+                        viewModel.onBiometricFailed()
+                    }
+                    is BiometricResult.FeatureUnavailable -> {
+                        biometricResultMessage = "Biometric feature unavailable on this device"
+                        isAuthenticating = false
+                    }
+                    is BiometricResult.HardwareUnavailable -> {
+                        biometricResultMessage = "Biometric hardware unavailable"
+                        isAuthenticating = false
                     }
                 }
-                is BiometricResult.AuthenticationSuccess -> {
-                    biometricResultMessage = "Authentication successful"
-                    onLoginClick()
-                }
-                is BiometricResult.AuthenticationError -> {
-                    biometricResultMessage = "Error: ${result.error}"
-                }
-                is BiometricResult.AuthenticationFailed -> {
-                    biometricResultMessage = "Authentication failed"
-                }
-                is BiometricResult.FeatureUnavailable -> {
-                    biometricResultMessage = "Feature unavailable"
-                }
-                is BiometricResult.HardwareUnavailable -> {
-                    biometricResultMessage = "Hardware unavailable"
-                }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error collecting biometric results", e)
+            biometricResultMessage = "Error: ${e.message}"
+            isAuthenticating = false
         }
     }
 
@@ -124,10 +188,10 @@ fun LoginScreen(
             InputField(
                 value = identity,
                 onValueChange = { identity = it },
-                label = "Email or Phone",
+                label = "Email",
                 leadingIcon = Icons.Filled.Email,
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    keyboardType = KeyboardType.Text
+                    keyboardType = KeyboardType.Email
                 )
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -140,13 +204,42 @@ fun LoginScreen(
             )
             Spacer(modifier = Modifier.height(28.dp))
 
+            if (loginState is LoginUiState.Error) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFFFEBEE)
+                    )
+                ) {
+                    Text(
+                        text = (loginState as LoginUiState.Error).message,
+                        color = Color(0xFFC62828),
+                        modifier = Modifier.padding(12.dp),
+                        fontSize = 14.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             Button(
-                onClick = onLoginClick,
+                onClick = {
+                    Log.d(TAG, "Login button clicked with email: $identity")
+                    viewModel.loginWithEmail(identity, password)
+                },
                 modifier = Modifier.fillMaxWidth().height(55.dp),
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7D7DFF))
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7D7DFF)),
+                enabled = loginState !is LoginUiState.Loading
             ) {
-                Text("Login Securely", fontSize = 16.sp)
+                if (loginState is LoginUiState.Loading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Login Securely", fontSize = 16.sp)
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -164,39 +257,81 @@ fun LoginScreen(
 
             OutlinedButton(
                 onClick = {
-                    promptManager?.showBiometricPrompt(
-                        title = "Device Authentication",
-                        description = "Authenticate securely to login"
-                    )
+                    if (!isAuthenticating && promptManager != null) {
+                        isAuthenticating = true
+                        biometricResultMessage = "Authenticating..."
+                        try {
+                            promptManager.showBiometricPrompt(
+                                title = "Device Authentication",
+                                description = "Authenticate securely to login"
+                            )
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Biometric error", e)
+                            biometricResultMessage = "Error: ${e.message}"
+                            isAuthenticating = false
+                        }
+                    } else if (promptManager == null) {
+                        biometricResultMessage = "Biometric not available"
+                    }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Color(0xFF7D7DFF))
+                border = BorderStroke(1.dp, Color(0xFF7D7DFF)),
+                enabled = !isAuthenticating && promptManager != null
             ) {
-                Icon(
-                    Icons.Filled.Fingerprint,
-                    contentDescription = null,
-                    tint = Color(0xFF7D7DFF)
-                )
+                if (isAuthenticating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color(0xFF7D7DFF),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        Icons.Filled.Fingerprint,
+                        contentDescription = null,
+                        tint = Color(0xFF7D7DFF)
+                    )
+                }
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Login with Fingerprint", color = Color(0xFF7D7DFF))
+                Text(
+                    if (isAuthenticating) "Authenticating..." else "Login with Fingerprint",
+                    color = Color(0xFF7D7DFF)
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
             biometricResultMessage?.let { message ->
-                Text(
-                    text = message,
-                    color = if (message.contains("successful")) Color.Green else Color.Black,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = when {
+                            message.contains("successful") -> Color(0xFFE8F5E9)
+                            message.contains("Error") || message.contains("failed") -> Color(0xFFFFEBEE)
+                            else -> Color(0xFFF5F5F5)
+                        }
+                    ),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = message,
+                        color = when {
+                            message.contains("successful") -> Color(0xFF2E7D32)
+                            message.contains("Error") || message.contains("failed") -> Color(0xFFC62828)
+                            else -> Color.Black
+                        },
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = "Forgot credentials?",
+                text = "Forgot password?",
                 color = Color(0xFF7D7DFF),
                 modifier = Modifier.clickable { onForgotClick() }
             )

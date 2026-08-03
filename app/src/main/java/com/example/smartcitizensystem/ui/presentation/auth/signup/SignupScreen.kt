@@ -1,6 +1,13 @@
 package com.example.smartcitizensystem.ui.presentation.auth.signup
 
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
+import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,20 +31,120 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.smartcitizensystem.ui.presentation.auth.biometric.BiometricPromptManager
 import com.example.smartcitizensystem.ui.presentation.auth.components.InputField
+import com.example.smartcitizensystem.ui.presentation.auth.components.PasswordInputField
+import com.example.smartcitizensystem.ui.presentation.auth.dao.BiometricResult
+import kotlinx.coroutines.flow.collectLatest
+import android.util.Log
+
+private const val TAG = "SignupScreen"
 
 @Composable
 fun SignupScreen(
+    viewModel: SignupViewModel = hiltViewModel(),
     modifier: Modifier = Modifier,
     onLoginClick: () -> Unit = {},
-    onFingerprintClick: () -> Unit = {},
-    onSignupClick: () -> Unit = {},
-    onForgotClick: () -> Unit = {}
+    onSignupSuccess: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val activity = context as? AppCompatActivity  // Changed to AppCompatActivity
-    val promptManager = remember { activity?.let { BiometricPromptManager(it) } }
+    val activity = context as? AppCompatActivity
+
+    val signupState = viewModel.signupState.value
+
+    val promptManager = remember {
+        try {
+            activity?.let { BiometricPromptManager(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create BiometricPromptManager", e)
+            null
+        }
+    }
+
+    val enrollLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { /* handle enroll result if needed */ }
+
+    var name by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    var nid by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var confirmPassword by rememberSaveable { mutableStateOf("") }
+    var agreed by rememberSaveable { mutableStateOf(false) }
+    var biometricResultMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    var isAuthenticating by rememberSaveable { mutableStateOf(false) }
+
+    // Handle signup state changes
+    LaunchedEffect(signupState) {
+        try {
+            when (signupState) {
+                is SignupUiState.Success -> {
+                    Log.d(TAG, "Signup successful, navigating to login")
+                    onSignupSuccess()
+                    viewModel.resetState()
+                }
+                is SignupUiState.Error -> {
+                    Log.e(TAG, "Signup error: ${signupState.message}")
+                }
+                else -> Unit
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling signup state", e)
+        }
+    }
+
+    // Collect biometric results
+    LaunchedEffect(promptManager) {
+        try {
+            promptManager?.promptResults?.collectLatest { result ->
+                when (result) {
+                    is BiometricResult.AuthenticationNotSet -> {
+                        biometricResultMessage = "Authentication not set. Please set up biometric."
+                        isAuthenticating = false
+                        if (Build.VERSION.SDK_INT >= 30) {
+                            try {
+                                val enrollIntent = Intent(Settings.ACTION_BIOMETRIC_ENROLL).apply {
+                                    putExtra(
+                                        Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
+                                        BIOMETRIC_STRONG or DEVICE_CREDENTIAL
+                                    )
+                                }
+                                enrollLauncher.launch(enrollIntent)
+                            } catch (e: Exception) {
+                                biometricResultMessage = "Cannot open biometric settings"
+                            }
+                        }
+                    }
+                    is BiometricResult.AuthenticationSuccess -> {
+                        biometricResultMessage = "Biometric registration successful! ✅"
+                        isAuthenticating = false
+                    }
+                    is BiometricResult.AuthenticationError -> {
+                        biometricResultMessage = "Error: ${result.error}"
+                        isAuthenticating = false
+                    }
+                    is BiometricResult.AuthenticationFailed -> {
+                        biometricResultMessage = "Authentication failed. Please try again."
+                        isAuthenticating = false
+                    }
+                    is BiometricResult.FeatureUnavailable -> {
+                        biometricResultMessage = "Biometric feature unavailable on this device"
+                        isAuthenticating = false
+                    }
+                    is BiometricResult.HardwareUnavailable -> {
+                        biometricResultMessage = "Biometric hardware unavailable"
+                        isAuthenticating = false
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error collecting biometric results", e)
+            biometricResultMessage = "Error: ${e.message}"
+            isAuthenticating = false
+        }
+    }
 
     Box(
         modifier = modifier
@@ -73,7 +180,6 @@ fun SignupScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            var name by rememberSaveable { mutableStateOf("") }
             InputField(
                 value = name,
                 onValueChange = { name = it },
@@ -84,29 +190,26 @@ fun SignupScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            var email by rememberSaveable { mutableStateOf("") }
             InputField(
                 value = email,
                 onValueChange = { email = it },
-                label = "Enter your email",
+                label = "Email Address",
                 leadingIcon = Icons.Default.Email,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            var phone by rememberSaveable { mutableStateOf("") }
             InputField(
                 value = phone,
                 onValueChange = { phone = it },
                 label = "Phone Number",
                 leadingIcon = Icons.Default.Phone,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            var nid by rememberSaveable { mutableStateOf("") }
             InputField(
                 value = nid,
                 onValueChange = { nid = it },
@@ -115,9 +218,42 @@ fun SignupScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            PasswordInputField(
+                value = password,
+                onValueChange = { password = it },
+                label = "Password",
+                leadingIcon = Icons.Default.Password
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            PasswordInputField(
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it },
+                label = "Confirm Password",
+                leadingIcon = Icons.Default.Password
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
 
-            var agreed by rememberSaveable { mutableStateOf(false) }
+            if (signupState is SignupUiState.Error) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFFFEBEE)
+                    )
+                ) {
+                    Text(
+                        text = (signupState as SignupUiState.Error).message,
+                        color = Color(0xFFC62828),
+                        modifier = Modifier.padding(12.dp),
+                        fontSize = 14.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -143,14 +279,72 @@ fun SignupScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            Button(
+                onClick = {
+                    try {
+                        Log.d(TAG, "Create Account clicked for: $email")
+                        viewModel.signupWithEmail(
+                            name = name,
+                            email = email,
+                            phone = phone,
+                            nid = nid,
+                            password = password,
+                            confirmPassword = confirmPassword
+                        )
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error during signup", e)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(55.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF7D7DFF)
+                ),
+                enabled = agreed && signupState !is SignupUiState.Loading
+            ) {
+                if (signupState is SignupUiState.Loading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Create Account", fontSize = 16.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Divider(modifier = Modifier.weight(1f))
+                Text("  OR  ", color = Color.Gray)
+                Divider(modifier = Modifier.weight(1f))
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             OutlinedButton(
                 onClick = {
-                    if (agreed) {
-                        promptManager?.showBiometricPrompt(
-                            title = "Biometric Registration",
-                            description = "Register your fingerprint for secure access"
-                        )
-                        onFingerprintClick()
+                    if (agreed && !isAuthenticating && promptManager != null) {
+                        isAuthenticating = true
+                        biometricResultMessage = "Authenticating..."
+                        try {
+                            promptManager.showBiometricPrompt(
+                                title = "Biometric Registration",
+                                description = "Register your fingerprint for secure access"
+                            )
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Biometric error", e)
+                            biometricResultMessage = "Error: ${e.message}"
+                            isAuthenticating = false
+                        }
+                    } else if (promptManager == null) {
+                        biometricResultMessage = "Biometric not available"
                     }
                 },
                 modifier = Modifier
@@ -158,15 +352,55 @@ fun SignupScreen(
                     .height(52.dp),
                 shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, Color(0xFF7D7DFF)),
-                enabled = agreed
+                enabled = agreed && !isAuthenticating && promptManager != null
             ) {
-                Icon(
-                    imageVector = Icons.Default.Fingerprint,
-                    contentDescription = null,
-                    tint = Color(0xFF7D7DFF)
-                )
+                if (isAuthenticating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color(0xFF7D7DFF),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Fingerprint,
+                        contentDescription = null,
+                        tint = Color(0xFF7D7DFF)
+                    )
+                }
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Biometric Authentication", color = Color(0xFF7D7DFF))
+                Text(
+                    if (isAuthenticating) "Registering..." else "Biometric Authentication",
+                    color = Color(0xFF7D7DFF)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            biometricResultMessage?.let { message ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = when {
+                            message.contains("successful") -> Color(0xFFE8F5E9)
+                            message.contains("Error") || message.contains("failed") -> Color(0xFFFFEBEE)
+                            else -> Color(0xFFF5F5F5)
+                        }
+                    ),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = message,
+                        color = when {
+                            message.contains("successful") -> Color(0xFF2E7D32)
+                            message.contains("Error") || message.contains("failed") -> Color(0xFFC62828)
+                            else -> Color.Black
+                        },
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))

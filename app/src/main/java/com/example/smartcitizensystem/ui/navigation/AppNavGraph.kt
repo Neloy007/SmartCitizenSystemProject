@@ -6,12 +6,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.smartcitizensystem.ui.presentation.auth.login.LoginScreen
 import com.example.smartcitizensystem.ui.presentation.auth.signup.SignupScreen
-import com.example.smartcitizensystem.ui.presentation.main.home.HomeScreen
+import com.example.smartcitizensystem.ui.presentation.main.MainScreen
 import com.example.smartcitizensystem.ui.presentation.splash.SplashScreen
 import com.example.smartcitizensystem.ui.presentation.welcome.WelcomeScreen
+import android.util.Log
+
+private const val TAG = "SetupNavGraph"
 
 @Composable
-fun SetupNavGraph(navController: NavHostController) {
+fun SetupNavGraph(
+    navController: NavHostController,
+    onLogout: () -> Unit = {}
+) {
     NavHost(
         navController = navController,
         startDestination = Screen.Splash.route
@@ -23,9 +29,11 @@ fun SetupNavGraph(navController: NavHostController) {
         composable(Screen.Welcome.route) {
             WelcomeScreen(
                 onLoginClick = {
+                    Log.d(TAG, "Navigating to Login")
                     navController.navigate(Screen.Login.route)
                 },
                 onSignupClick = {
+                    Log.d(TAG, "Navigating to Signup")
                     navController.navigate(Screen.Signup.route)
                 }
             )
@@ -34,14 +42,14 @@ fun SetupNavGraph(navController: NavHostController) {
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginClick = {
+                    Log.d(TAG, "Login successful, navigating to Home")
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
                 onSignupClick = {
-                    navController.navigate(Screen.Signup.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
-                    }
+                    Log.d(TAG, "Navigating to Signup from Login")
+                    navController.navigate(Screen.Signup.route)
                 }
             )
         }
@@ -49,6 +57,13 @@ fun SetupNavGraph(navController: NavHostController) {
         composable(Screen.Signup.route) {
             SignupScreen(
                 onLoginClick = {
+                    Log.d(TAG, "Navigating to Login from Signup")
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Signup.route) { inclusive = true }
+                    }
+                },
+                onSignupSuccess = {
+                    Log.d(TAG, "Signup successful, navigating to Login")
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Signup.route) { inclusive = true }
                     }
@@ -57,7 +72,10 @@ fun SetupNavGraph(navController: NavHostController) {
         }
 
         composable(Screen.Home.route) {
-            HomeScreen()
+            MainScreen(
+                navController = navController,
+                onLogout = onLogout
+            )
         }
     }
 }
