@@ -16,6 +16,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.smartcitizensystem.data.models.CustomMinistryPostsData
+import com.example.smartcitizensystem.ui.presentation.main.home.components.CustomMinistryPostCard
 import com.example.smartcitizensystem.ui.presentation.main.home.components.QuickActionCard
 import com.example.smartcitizensystem.ui.presentation.main.home.components.SocialPostCard
 import kotlinx.coroutines.launch
@@ -26,18 +28,16 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    // Use socialPosts instead of posts
     val socialPosts = viewModel.socialPosts.value
     val isLoading = viewModel.isLoading.value
     val error = viewModel.error.value
 
-    // LazyListState to track scroll position
-    val listState = rememberLazyListState()
+    // ✅ Get custom ministry posts
+    val customPosts = remember { CustomMinistryPostsData.getPosts() }
 
-    // Coroutine scope for scrolling
+    val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
-    // Track if we should show the FAB
     val showFab by remember {
         derivedStateOf {
             listState.firstVisibleItemIndex > 0
@@ -49,7 +49,6 @@ fun HomeScreen(
         viewModel.fetchSocialFeed()
     }
 
-    // Function to scroll to top
     val scrollToTop: () -> Unit = {
         coroutineScope.launch {
             listState.animateScrollToItem(0)
@@ -67,6 +66,7 @@ fun HomeScreen(
                     )
                 },
                 actions = {
+                    // Refresh button
                     IconButton(onClick = {
                         viewModel.fetchSocialFeed()
                     }) {
@@ -138,7 +138,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Check out the latest posts",
+                            text = "Stay updated with ministry news & community posts",
                             fontSize = 14.sp,
                             color = Color.Gray
                         )
@@ -199,7 +199,7 @@ fun HomeScreen(
                 }
             }
 
-            // Feed Section Header
+            // ✅ Custom Ministry Posts Section
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -207,20 +207,55 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Latest Feed",
+                        text = "🏛️ Ministry Updates",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
                     )
                     Text(
-                        text = "📱 Social",
+                        text = "🇧🇩 Official",
                         fontSize = 12.sp,
                         color = Color.Gray
                     )
                 }
             }
 
-            // Loading State
+            // ✅ Display custom ministry posts
+            items(customPosts) { post ->
+                CustomMinistryPostCard(post = post)
+            }
+
+            // Divider between custom and JSONPlaceholder posts
+            item {
+                Divider(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    color = Color.LightGray,
+                    thickness = 1.dp
+                )
+            }
+
+            // JSONPlaceholder Feed Section Header
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "📱 Community Feed",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                    Text(
+                        text = "🌐 From JSONPlaceholder",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+
+            // Loading State for JSONPlaceholder
             if (isLoading) {
                 item {
                     Box(
@@ -237,7 +272,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Loading feed...",
+                                text = "Loading community posts...",
                                 color = Color.Gray,
                                 fontSize = 14.sp
                             )
@@ -246,7 +281,7 @@ fun HomeScreen(
                 }
             }
 
-            // Error State
+            // Error State for JSONPlaceholder
             error?.let { errorMessage ->
                 item {
                     Card(
@@ -277,14 +312,14 @@ fun HomeScreen(
                 }
             }
 
-            // Social Feed Posts - Using SocialPostCard
+            // JSONPlaceholder Posts
             if (!isLoading && socialPosts.isNotEmpty()) {
                 items(socialPosts) { post ->
                     SocialPostCard(post = post)
                 }
             }
 
-            // Empty state
+            // Empty state for JSONPlaceholder
             if (!isLoading && socialPosts.isEmpty() && error == null) {
                 item {
                     Box(
@@ -304,7 +339,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "No posts available",
+                                text = "No community posts available",
                                 color = Color.Gray,
                                 fontSize = 14.sp
                             )
@@ -313,7 +348,7 @@ fun HomeScreen(
                 }
             }
 
-            // Bottom spacer for better scrolling experience
+            // Bottom spacer
             item {
                 Spacer(modifier = Modifier.height(16.dp))
             }

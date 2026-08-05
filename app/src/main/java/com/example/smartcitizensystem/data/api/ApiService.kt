@@ -1,6 +1,7 @@
 package com.example.smartcitizensystem.data.api
 
 import com.example.smartcitizensystem.data.models.Comment
+import com.example.smartcitizensystem.data.models.MinistryFeedResponse
 import com.example.smartcitizensystem.data.models.Photo
 import com.example.smartcitizensystem.data.models.Post
 import com.example.smartcitizensystem.data.models.Todo
@@ -28,7 +29,10 @@ interface ApiService {
     @GET("users")
     suspend fun getUsers(): List<User>
 
-    // ✅ Add this endpoint
     @GET("photos")
     suspend fun getPhotos(): List<Photo>
+
+    // Ministry Feed endpoint
+    @GET("api/posts")
+    suspend fun getMinistryPosts(): MinistryFeedResponse
 }

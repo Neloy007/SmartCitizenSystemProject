@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smartcitizensystem.data.api.RetrofitInstance
+import com.example.smartcitizensystem.data.models.MinistryPost
 import com.example.smartcitizensystem.data.models.Photo
 import com.example.smartcitizensystem.data.models.Post
 import com.example.smartcitizensystem.data.models.SocialPost
@@ -12,6 +13,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import android.util.Log
+
+private const val TAG = "HomeViewModel"
 
 @HiltViewModel
 class HomeViewModel @Inject constructor() : ViewModel() {
@@ -23,19 +27,49 @@ class HomeViewModel @Inject constructor() : ViewModel() {
     private val _socialPosts = mutableStateOf<List<SocialPost>>(emptyList())
     val socialPosts: State<List<SocialPost>> = _socialPosts
 
+    // Ministry posts from your backend
+    private val _ministryPosts = mutableStateOf<List<MinistryPost>>(emptyList())
+    val ministryPosts: State<List<MinistryPost>> = _ministryPosts
+
     private val _isLoading = mutableStateOf(false)
     val isLoading: State<Boolean> = _isLoading
 
     private val _error = mutableStateOf<String?>(null)
     val error: State<String?> = _error
 
-    // Fetch social feed with images
+//    //  Fetch from  backend
+//    fun fetchMinistryFeed() {
+//        viewModelScope.launch {
+//            _isLoading.value = true
+//            _error.value = null
+//            try {
+//                Log.d(TAG, "Fetching ministry feed...")
+//                val response = RetrofitInstance.ministryApi.getMinistryPosts()
+//                Log.d(TAG, "Response: success=${response.success}, count=${response.count}")
+//                if (response.success) {
+//                    _ministryPosts.value = response.data
+//                } else {
+//                    _error.value = "Failed to fetch ministry posts"
+//                }
+//            } catch (e: Exception) {
+//                Log.e(TAG, "Error fetching ministry feed: ${e.message}", e)
+//                _error.value = e.message ?: "Failed to fetch feed"
+//            } finally {
+//                _isLoading.value = false
+//            }
+//        }
+//    }
+
+
+
     fun fetchSocialFeed() {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
             try {
-                // Fetch posts and photos in parallel for better performance
+                Log.d(TAG, "Fetching social feed from JSONPlaceholder...")
+
+                // Fetch posts and photos in parallel
                 val postsDeferred = async { RetrofitInstance.api.getPosts() }
                 val photosDeferred = async { RetrofitInstance.api.getPhotos() }
 
@@ -44,7 +78,6 @@ class HomeViewModel @Inject constructor() : ViewModel() {
 
                 // Combine posts with photos
                 val combinedPosts = posts.mapIndexed { index, post ->
-                    // Use post.id to get a consistent photo
                     val photoIndex = (post.id - 1) % photos.size
                     val photo = if (photos.isNotEmpty()) photos[photoIndex] else null
 
@@ -62,7 +95,10 @@ class HomeViewModel @Inject constructor() : ViewModel() {
 
                 _socialPosts.value = combinedPosts
                 _posts.value = posts
+                Log.d(TAG, "Fetched ${combinedPosts.size} posts with images")
+
             } catch (e: Exception) {
+                Log.e(TAG, "Error fetching social feed: ${e.message}", e)
                 _error.value = e.message ?: "Failed to fetch feed"
             } finally {
                 _isLoading.value = false
@@ -70,7 +106,6 @@ class HomeViewModel @Inject constructor() : ViewModel() {
         }
     }
 
-    // Original fetchPosts method
     fun fetchPosts() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -108,4 +143,3 @@ class HomeViewModel @Inject constructor() : ViewModel() {
         }
     }
 }
-
