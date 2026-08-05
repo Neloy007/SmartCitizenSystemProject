@@ -1,10 +1,10 @@
 package com.example.smartcitizensystem.data.api
 
-import androidx.compose.ui.graphics.vector.Path
+import com.example.smartcitizensystem.data.models.Comment
+import com.example.smartcitizensystem.data.models.Photo
 import com.example.smartcitizensystem.data.models.Post
 import com.example.smartcitizensystem.data.models.Todo
 import com.example.smartcitizensystem.data.models.User
-import org.w3c.dom.Comment
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -27,4 +27,8 @@ interface ApiService {
 
     @GET("users")
     suspend fun getUsers(): List<User>
+
+    // ✅ Add this endpoint
+    @GET("photos")
+    suspend fun getPhotos(): List<Photo>
 }
