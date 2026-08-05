@@ -17,6 +17,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.smartcitizensystem.model.BottomNavItem
 import com.example.smartcitizensystem.model.DrawerItem
+import com.example.smartcitizensystem.ui.presentation.main.bottomnav.GlassBottomNavigation
 import com.example.smartcitizensystem.ui.presentation.main.drawer.AboutScreen
 import com.example.smartcitizensystem.ui.presentation.main.drawer.SettingsScreen
 import com.example.smartcitizensystem.ui.presentation.main.election.ElectionScreen
@@ -32,7 +33,7 @@ fun MainScreen(
     navController: NavHostController, // outer controller: only used for app-level actions (logout)
     onLogout: () -> Unit = {}
 ) {
-    // ✅ Separate controller for everything INSIDE MainScreen (bottom tabs + drawer routes).
+    // Separate controller for everything INSIDE MainScreen (bottom tabs + drawer routes).
     // This must never be the same instance as the outer `navController`, or navigating a
     // tab will also navigate the outer NavHost and pop MainScreen off the back stack.
     val bottomNavController = rememberNavController()
@@ -50,7 +51,7 @@ fun MainScreen(
     val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // ✅ Drawer (Hamburger menu)
+    //  Drawer (Hamburger menu)
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -67,8 +68,12 @@ fun MainScreen(
         },
         gesturesEnabled = true
     ) {
-        // ✅ Scaffold with TopBar and BottomBar
+        //  Scaffold with TopBar and BottomBar
         Scaffold(
+            containerColor = Color.White, // prevents the area behind/around bottomBar from
+            // falling back to MaterialTheme.colorScheme.background, which is dark in your
+            // app's theme — that's what was showing through the transparent padding around
+            // GlassBottomNavigation and making it look black.
             topBar = {
                 TopAppBar(
                     title = {
@@ -78,7 +83,7 @@ fun MainScreen(
                             fontWeight = FontWeight.Bold
                         )
                     },
-                    // ✅ Navigation Icon (Hamburger Menu)
+                    //  Navigation Icon (Hamburger Menu)
                     navigationIcon = {
                         IconButton(
                             onClick = {
@@ -107,57 +112,15 @@ fun MainScreen(
                     )
                 )
             },
-            // ✅ Bottom Navigation Bar
+            //  Bottom Navigation Bar (custom glass style)
             bottomBar = {
-                NavigationBar(
-                    containerColor = Color.White,
-                    tonalElevation = 0.dp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(65.dp)
-                ) {
-                    bottomNavItems.forEach { item ->
-                        val isSelected = currentRoute == item.route
-
-                        NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    item.icon,
-                                    contentDescription = item.label,
-                                    modifier = Modifier.size(26.dp)
-                                )
-                            },
-                            label = {
-                                Text(
-                                    text = item.label,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            },
-                            selected = isSelected,
-                            onClick = {
-                                // ✅ navigate the INNER controller, not the outer one
-                                bottomNavController.navigate(item.route) {
-                                    launchSingleTop = true
-                                    restoreState = true
-                                    popUpTo(bottomNavController.graph.startDestinationId) {
-                                        saveState = true
-                                    }
-                                }
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color(0xFF7D7DFF),
-                                unselectedIconColor = Color.Gray,
-                                selectedTextColor = Color(0xFF7D7DFF),
-                                unselectedTextColor = Color.Gray,
-                                indicatorColor = Color(0xFF7D7DFF).copy(alpha = 0.1f)
-                            )
-                        )
-                    }
-                }
+                GlassBottomNavigation(
+                    navController = bottomNavController,
+                    items = bottomNavItems
+                )
             }
         ) { paddingValues ->
-            // ✅ Content area - NavHost for bottom navigation, driven by bottomNavController
+            // Content area - NavHost for bottom navigation, driven by bottomNavController
             NavHost(
                 navController = bottomNavController,
                 startDestination = BottomNavItem.Home.route,
@@ -192,7 +155,7 @@ fun MainScreen(
     }
 }
 
-// ✅ Helper function for dynamic title
+//  Helper function for dynamic title
 fun getTitleForRoute(route: String?): String {
     return when (route) {
         "home_screen" -> "Smart Citizen System"
@@ -206,7 +169,7 @@ fun getTitleForRoute(route: String?): String {
     }
 }
 
-// ✅ Drawer Content
+//  Drawer Content
 @Composable
 fun DrawerContent(
     navController: NavHostController, // expects the INNER (bottomNavController) instance

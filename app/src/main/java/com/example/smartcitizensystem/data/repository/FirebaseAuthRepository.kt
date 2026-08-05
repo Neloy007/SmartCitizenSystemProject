@@ -12,6 +12,7 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 import android.util.Log
+import com.example.smartcitizensystem.data.models.User
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
@@ -141,9 +142,11 @@ class FirebaseAuthRepository @Inject constructor() {
             "email" to email,
             "phone" to phone,
             "nid" to nid,
+            "address" to "",
             "createdAt" to System.currentTimeMillis(),
             "updatedAt" to System.currentTimeMillis(),
             "isEmailVerified" to false,
+            "isFaceVerified" to false,
             "role" to "citizen"
         )
 
@@ -158,6 +161,59 @@ class FirebaseAuthRepository @Inject constructor() {
             Result.success(data)
         } catch (e: Exception) {
             Log.e(TAG, "Get user data failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    // Add this method to get the current user's profile data using your User model
+    suspend fun getCurrentUserProfile(): Result<User> {
+        return try {
+            val firebaseUser = auth.currentUser ?: throw Exception("No user logged in")
+            Log.d(TAG, "Getting user profile for: ${firebaseUser.uid}")
+            val document = firestore.collection("users").document(firebaseUser.uid).get().await()
+            val data = document.data ?: throw Exception("User data not found")
+
+            val user = User(
+                id = data["id"] as? String ?: firebaseUser.uid,
+                name = data["name"] as? String ?: firebaseUser.displayName ?: "",
+                email = data["email"] as? String ?: firebaseUser.email ?: "",
+                phone = data["phone"] as? String ?: "",
+                nid = data["nid"] as? String ?: "",
+                address = data["address"] as? String ?: "",
+                profileImage = data["profileImage"] as? String,
+                isBiometricEnabled = data["isBiometricEnabled"] as? Boolean ?: false,
+                // ✅ New fields — read from Firestore, falling back sensibly if an older
+                // document doesn't have them yet (pre-migration users).
+                isEmailVerified = data["isEmailVerified"] as? Boolean ?: firebaseUser.isEmailVerified,
+                isFaceVerified = data["isFaceVerified"] as? Boolean ?: false,
+                createdAt = data["createdAt"] as? String ?: System.currentTimeMillis().toString(),
+                updatedAt = data["updatedAt"] as? String ?: System.currentTimeMillis().toString()
+            )
+            Result.success(user)
+        } catch (e: Exception) {
+            Log.e(TAG, "Get user profile failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Generic partial update for the current user's Firestore document. Used to persist
+     * profile-completion fields (address, profileImage) without needing a dedicated method
+     * per field. `updatedAt` is stamped automatically.
+     *
+     * NOTE: `profileImage` here is expected to be a URL string. If you're passing a local
+     * content:// URI (as the current photo picker does), it will persist but won't resolve
+     * on other devices or after the OS revokes the URI grant — see the TODO in
+     * ProfileViewModel.updateProfileImageUri for wiring real Firebase Storage upload.
+     */
+    suspend fun updateUserProfileFields(fields: Map<String, Any>): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: throw Exception("No user logged in")
+            val updates = fields + mapOf("updatedAt" to System.currentTimeMillis())
+            firestore.collection("users").document(uid).update(updates).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Update profile fields failed: ${e.message}", e)
             Result.failure(e)
         }
     }
