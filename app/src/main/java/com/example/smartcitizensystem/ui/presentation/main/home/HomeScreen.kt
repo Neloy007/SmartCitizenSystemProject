@@ -16,7 +16,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavHostController
 import com.example.smartcitizensystem.data.models.CustomMinistryPostsData
+import com.example.smartcitizensystem.model.BottomNavItem
 import com.example.smartcitizensystem.ui.presentation.main.home.components.CustomMinistryPostCard
 import com.example.smartcitizensystem.ui.presentation.main.home.components.QuickActionCard
 import com.example.smartcitizensystem.ui.presentation.main.home.components.SocialPostCard
@@ -26,13 +28,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel = hiltViewModel()
+    viewModel: HomeViewModel = hiltViewModel(),
+    navController: NavHostController? = null
 ) {
     val socialPosts = viewModel.socialPosts.value
     val isLoading = viewModel.isLoading.value
     val error = viewModel.error.value
 
-    // ✅ Get custom ministry posts
     val customPosts = remember { CustomMinistryPostsData.getPosts() }
 
     val listState = rememberLazyListState()
@@ -44,7 +46,6 @@ fun HomeScreen(
         }
     }
 
-    // Fetch social feed when screen loads
     LaunchedEffect(Unit) {
         viewModel.fetchSocialFeed()
     }
@@ -55,60 +56,41 @@ fun HomeScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Smart Citizen Feed",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                actions = {
-                    // Refresh button
-                    IconButton(onClick = {
-                        viewModel.fetchSocialFeed()
-                    }) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = "Refresh"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White,
-                    titleContentColor = Color.Black,
-                    actionIconContentColor = Color(0xFF7D7DFF)
-                )
-            )
-        },
-        floatingActionButton = {
-            if (showFab) {
-                FloatingActionButton(
-                    onClick = scrollToTop,
-                    containerColor = Color(0xFF7D7DFF),
-                    contentColor = Color.White,
-                    elevation = FloatingActionButtonDefaults.elevation(
-                        defaultElevation = 6.dp
-                    ),
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        Icons.Default.KeyboardArrowUp,
-                        contentDescription = "Scroll to top",
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            }
-        },
-        floatingActionButtonPosition = FabPosition.EndOverlay
-    ) { paddingValues ->
+    // Navigation functions
+    val navigateToElection: () -> Unit = {
+        navController?.navigate(BottomNavItem.Election.route) {
+            launchSingleTop = true
+        } ?: Unit
+    }
+
+    val navigateToEmergency: () -> Unit = {
+        navController?.navigate(BottomNavItem.Emergency.route) {
+            launchSingleTop = true
+        } ?: Unit
+    }
+
+    val navigateToLicences: () -> Unit = {
+        navController?.navigate("licences_screen") {
+            launchSingleTop = true
+        } ?: Unit
+    }
+
+    val navigateToProfile: () -> Unit = {
+        navController?.navigate(BottomNavItem.Profile.route) {
+            launchSingleTop = true
+        } ?: Unit
+    }
+
+    // ✅ Removed Scaffold - just render content directly
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.White)
+    ) {
         LazyColumn(
             state = listState,
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
                 .background(Color.White),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(16.dp)
@@ -167,13 +149,15 @@ fun HomeScreen(
                         title = "Vote",
                         icon = Icons.Default.HowToVote,
                         backgroundColor = Color(0xFFE8E8FF),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onClick = navigateToElection
                     )
                     QuickActionCard(
                         title = "Emergency",
                         icon = Icons.Default.Warning,
                         backgroundColor = Color(0xFFFFE8E8),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onClick = navigateToEmergency
                     )
                 }
             }
@@ -188,18 +172,20 @@ fun HomeScreen(
                         title = "Licences",
                         icon = Icons.Default.DocumentScanner,
                         backgroundColor = Color(0xFFE8FFE8),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onClick = navigateToLicences
                     )
                     QuickActionCard(
                         title = "Profile",
                         icon = Icons.Default.Person,
                         backgroundColor = Color(0xFFFFF0E8),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onClick = navigateToProfile
                     )
                 }
             }
 
-            // ✅ Custom Ministry Posts Section
+            // Custom Ministry Posts Section
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -220,12 +206,12 @@ fun HomeScreen(
                 }
             }
 
-            // ✅ Display custom ministry posts
+            // Custom ministry posts
             items(customPosts) { post ->
                 CustomMinistryPostCard(post = post)
             }
 
-            // Divider between custom and JSONPlaceholder posts
+            // Divider
             item {
                 Divider(
                     modifier = Modifier.padding(vertical = 8.dp),
@@ -255,7 +241,7 @@ fun HomeScreen(
                 }
             }
 
-            // Loading State for JSONPlaceholder
+            // Loading State
             if (isLoading) {
                 item {
                     Box(
@@ -281,7 +267,7 @@ fun HomeScreen(
                 }
             }
 
-            // Error State for JSONPlaceholder
+            // Error State
             error?.let { errorMessage ->
                 item {
                     Card(
@@ -319,7 +305,7 @@ fun HomeScreen(
                 }
             }
 
-            // Empty state for JSONPlaceholder
+            // Empty state
             if (!isLoading && socialPosts.isEmpty() && error == null) {
                 item {
                     Box(
@@ -351,6 +337,28 @@ fun HomeScreen(
             // Bottom spacer
             item {
                 Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+
+        // ✅ Floating Action Button inside Box
+        if (showFab) {
+            FloatingActionButton(
+                onClick = scrollToTop,
+                containerColor = Color(0xFF7D7DFF),
+                contentColor = Color.White,
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 6.dp
+                ),
+                modifier = Modifier
+                    .size(56.dp)
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    Icons.Default.KeyboardArrowUp,
+                    contentDescription = "Scroll to top",
+                    modifier = Modifier.size(32.dp)
+                )
             }
         }
     }

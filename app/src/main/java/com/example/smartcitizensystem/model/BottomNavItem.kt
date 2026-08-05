@@ -10,9 +10,25 @@ data class BottomNavItem(
     val route: String
 ) {
     companion object {
-        val Home = BottomNavItem("Home", Icons.Default.Home, "home_screen")
-        val Election = BottomNavItem("Election", Icons.Default.HowToVote, "election_screen")
-        val Emergency = BottomNavItem("Emergency", Icons.Default.Warning, "emergency_screen")
-        val Profile = BottomNavItem("Profile", Icons.Default.Person, "profile_screen")
+        val Home = BottomNavItem(
+            label = "Home",
+            icon = Icons.Default.Home,
+            route = "home_screen"
+        )
+        val Election = BottomNavItem(
+            label = "Election",
+            icon = Icons.Default.HowToVote,
+            route = "election_screen"
+        )
+        val Emergency = BottomNavItem(
+            label = "Emergency",
+            icon = Icons.Default.Warning,
+            route = "emergency_screen"
+        )
+        val Profile = BottomNavItem(
+            label = "Profile",
+            icon = Icons.Default.Person,
+            route = "profile_screen"
+        )
     }
 }

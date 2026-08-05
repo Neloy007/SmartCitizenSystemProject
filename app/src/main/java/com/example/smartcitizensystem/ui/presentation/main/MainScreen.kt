@@ -11,7 +11,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.example.smartcitizensystem.model.BottomNavItem
 import com.example.smartcitizensystem.model.DrawerItem
 import com.example.smartcitizensystem.ui.presentation.main.drawer.AboutScreen
@@ -26,9 +29,14 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    navController: NavHostController,
+    navController: NavHostController, // outer controller: only used for app-level actions (logout)
     onLogout: () -> Unit = {}
 ) {
+    // ✅ Separate controller for everything INSIDE MainScreen (bottom tabs + drawer routes).
+    // This must never be the same instance as the outer `navController`, or navigating a
+    // tab will also navigate the outer NavHost and pop MainScreen off the back stack.
+    val bottomNavController = rememberNavController()
+
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -39,11 +47,15 @@ fun MainScreen(
         BottomNavItem.Profile
     )
 
+    val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    // ✅ Drawer (Hamburger menu)
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             DrawerContent(
-                navController = navController,
+                navController = bottomNavController,
                 onCloseDrawer = {
                     scope.launch { drawerState.close() }
                 },
@@ -55,16 +67,18 @@ fun MainScreen(
         },
         gesturesEnabled = true
     ) {
+        // ✅ Scaffold with TopBar and BottomBar
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = {
                         Text(
-                            text = "Smart Citizen System",
+                            text = getTitleForRoute(currentRoute),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
                     },
+                    // ✅ Navigation Icon (Hamburger Menu)
                     navigationIcon = {
                         IconButton(
                             onClick = {
@@ -93,37 +107,42 @@ fun MainScreen(
                     )
                 )
             },
+            // ✅ Bottom Navigation Bar
             bottomBar = {
                 NavigationBar(
                     containerColor = Color.White,
-                    tonalElevation = 0.dp
+                    tonalElevation = 0.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(65.dp)
                 ) {
-                    val navBackStackEntry by navController.currentBackStackEntryAsState()
-                    val currentRoute = navBackStackEntry?.destination?.route
-
                     bottomNavItems.forEach { item ->
+                        val isSelected = currentRoute == item.route
+
                         NavigationBarItem(
                             icon = {
                                 Icon(
                                     item.icon,
                                     contentDescription = item.label,
-                                    tint = if (currentRoute == item.route) Color(0xFF7D7DFF) else Color.Gray
+                                    modifier = Modifier.size(26.dp)
                                 )
                             },
                             label = {
                                 Text(
-                                    item.label,
-                                    color = if (currentRoute == item.route) Color(0xFF7D7DFF) else Color.Gray
+                                    text = item.label,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
                             },
-                            selected = currentRoute == item.route,
+                            selected = isSelected,
                             onClick = {
-                                navController.navigate(item.route) {
-                                    popUpTo(navController.graph.startDestinationId) {
-                                        saveState = true
-                                    }
+                                // ✅ navigate the INNER controller, not the outer one
+                                bottomNavController.navigate(item.route) {
                                     launchSingleTop = true
                                     restoreState = true
+                                    popUpTo(bottomNavController.graph.startDestinationId) {
+                                        saveState = true
+                                    }
                                 }
                             },
                             colors = NavigationBarItemDefaults.colors(
@@ -131,43 +150,69 @@ fun MainScreen(
                                 unselectedIconColor = Color.Gray,
                                 selectedTextColor = Color(0xFF7D7DFF),
                                 unselectedTextColor = Color.Gray,
-                                indicatorColor = Color.Transparent
+                                indicatorColor = Color(0xFF7D7DFF).copy(alpha = 0.1f)
                             )
                         )
                     }
                 }
             }
         ) { paddingValues ->
-            // Render content based on current route
-            val currentRoute = navController.currentBackStackEntry?.destination?.route
-
-            Column(
+            // ✅ Content area - NavHost for bottom navigation, driven by bottomNavController
+            NavHost(
+                navController = bottomNavController,
+                startDestination = BottomNavItem.Home.route,
                 modifier = Modifier
                     .padding(paddingValues)
                     .fillMaxSize()
             ) {
-                when (currentRoute) {
-                    BottomNavItem.Home.route -> HomeScreen()
-                    BottomNavItem.Election.route -> ElectionScreen()
-                    BottomNavItem.Emergency.route -> EmergencyScreen()
-                    BottomNavItem.Profile.route -> ProfileScreen()
-                    "licences_screen" -> LicencesScreen()
-                    "settings_screen" -> SettingsScreen()
-                    "about_screen" -> AboutScreen()
-                    else -> HomeScreen()
+                composable(BottomNavItem.Home.route) {
+                    // pass the INNER controller so quick actions switch tabs correctly
+                    HomeScreen(navController = bottomNavController)
+                }
+                composable(BottomNavItem.Election.route) {
+                    ElectionScreen()
+                }
+                composable(BottomNavItem.Emergency.route) {
+                    EmergencyScreen()
+                }
+                composable(BottomNavItem.Profile.route) {
+                    ProfileScreen()
+                }
+                composable("licences_screen") {
+                    LicencesScreen()
+                }
+                composable("settings_screen") {
+                    SettingsScreen()
+                }
+                composable("about_screen") {
+                    AboutScreen()
                 }
             }
         }
     }
 }
 
+// ✅ Helper function for dynamic title
+fun getTitleForRoute(route: String?): String {
+    return when (route) {
+        "home_screen" -> "Smart Citizen System"
+        "election_screen" -> "Election"
+        "emergency_screen" -> "Emergency"
+        "profile_screen" -> "Profile"
+        "licences_screen" -> "Licences"
+        "settings_screen" -> "Settings"
+        "about_screen" -> "About"
+        else -> "Smart Citizen System"
+    }
+}
+
+// ✅ Drawer Content
 @Composable
 fun DrawerContent(
-    navController: NavHostController,
+    navController: NavHostController, // expects the INNER (bottomNavController) instance
     onCloseDrawer: () -> Unit,
     onLogout: () -> Unit
 ) {
-    // Use the DrawerItem from your model
     val drawerItems = listOf(
         DrawerItem.Profile,
         DrawerItem.Settings,
@@ -205,7 +250,6 @@ fun DrawerContent(
                     )
                 }
             }
-
             Divider(color = Color.LightGray)
         }
 

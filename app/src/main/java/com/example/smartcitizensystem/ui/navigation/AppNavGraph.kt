@@ -22,6 +22,7 @@ fun SetupNavGraph(
         navController = navController,
         startDestination = Screen.Splash.route
     ) {
+        // Auth screens
         composable(Screen.Splash.route) {
             SplashScreen(navController = navController)
         }
@@ -63,14 +64,23 @@ fun SetupNavGraph(
                     }
                 },
                 onSignupSuccess = {
-                    Log.d(TAG, "Signup successful, navigating to Login")
-                    navController.navigate(Screen.Login.route) {
+                    Log.d(TAG, "Signup successful, navigating to Home")
+                    navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Signup.route) { inclusive = true }
                     }
                 }
             )
         }
 
+        // ✅ Main screen with bottom navigation (wrapper).
+        // NOTE: BottomNavItem.Home/Election/Emergency/Profile and the drawer routes
+        // ("licences_screen", "settings_screen", "about_screen") are intentionally
+        // NOT registered here anymore. They now live exclusively inside MainScreen's
+        // own internal NavHost (see MainScreen.kt / bottomNavController). Registering
+        // them here too was the bug: MainScreen's bottom bar navigated using the SAME
+        // NavHostController as this outer graph, so tapping a tab matched this outer
+        // composable() instead of the nested one, popping MainScreen (and its Scaffold/
+        // bottom bar) off the screen entirely.
         composable(Screen.Home.route) {
             MainScreen(
                 navController = navController,
