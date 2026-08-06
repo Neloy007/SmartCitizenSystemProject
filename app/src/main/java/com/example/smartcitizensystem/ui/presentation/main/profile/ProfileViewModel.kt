@@ -35,6 +35,10 @@ class ProfileViewModel @Inject constructor(
     private val _isUploadingPhoto = mutableStateOf(false)
     val isUploadingPhoto: State<Boolean> = _isUploadingPhoto
 
+    // ✅ Track face verification status
+    private val _isFaceVerified = mutableStateOf(false)
+    val isFaceVerified: State<Boolean> = _isFaceVerified
+
     init {
         loadUserProfile()
     }
@@ -47,6 +51,7 @@ class ProfileViewModel @Inject constructor(
                 val result = authRepository.getCurrentUserProfile()
                 result.onSuccess { userProfile ->
                     _user.value = userProfile
+                    _isFaceVerified.value = userProfile.isFaceVerified ?: false
                     Log.d(TAG, "User profile loaded: ${userProfile.name}")
                 }.onFailure { error ->
                     _error.value = error.message ?: "Failed to load profile"
@@ -107,5 +112,57 @@ class ProfileViewModel @Inject constructor(
             }
             _isUploadingPhoto.value = false
         }
+    }
+
+    /**
+     * Updates the face verification status after a successful face scan.
+     * Called from FaceVerificationViewModel after verification completes.
+     */
+    fun updateFaceVerificationStatus(isVerified: Boolean) {
+        viewModelScope.launch {
+            val result = authRepository.updateUserProfileFields(mapOf("isFaceVerified" to isVerified))
+            result.onSuccess {
+                _user.value = _user.value?.copy(isFaceVerified = isVerified)
+                _isFaceVerified.value = isVerified
+                Log.d(TAG, "Face verification status updated: $isVerified")
+            }.onFailure { error ->
+                Log.e(TAG, "Failed to update face verification status: ${error.message}", error)
+            }
+        }
+    }
+
+    /**
+     * Check if the user is fully verified (all 4 items completed).
+     * Items: Name, Phone, Address, Profile Photo
+     */
+    fun isFullyVerified(): Boolean {
+        val user = _user.value ?: return false
+        return user.name.isNotBlank() &&
+                user.phone.isNotBlank() &&
+                user.address.isNotBlank() &&
+                !user.profileImage.isNullOrBlank()
+    }
+
+    /**
+     * Get the number of completed profile items.
+     * Items: Name, Phone, Address, Profile Photo
+     */
+    fun getCompletedItemsCount(): Int {
+        val user = _user.value ?: return 0
+        var count = 0
+        if (user.name.isNotBlank()) count++
+        if (user.phone.isNotBlank()) count++
+        if (user.address.isNotBlank()) count++
+        if (!user.profileImage.isNullOrBlank()) count++
+        return count
+    }
+
+    /**
+     * Get profile completion percentage.
+     */
+    fun getCompletionPercentage(): Float {
+        val totalItems = 4
+        val completed = getCompletedItemsCount()
+        return completed.toFloat() / totalItems.toFloat()
     }
 }

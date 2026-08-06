@@ -17,11 +17,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.smartcitizensystem.model.BottomNavItem
 import com.example.smartcitizensystem.model.DrawerItem
+import com.example.smartcitizensystem.ui.navigation.Screen
 import com.example.smartcitizensystem.ui.presentation.main.bottomnav.GlassBottomNavigation
 import com.example.smartcitizensystem.ui.presentation.main.drawer.AboutScreen
 import com.example.smartcitizensystem.ui.presentation.main.drawer.SettingsScreen
 import com.example.smartcitizensystem.ui.presentation.main.election.ElectionScreen
 import com.example.smartcitizensystem.ui.presentation.main.emergency.EmergencyScreen
+import com.example.smartcitizensystem.ui.presentation.main.facescan.FaceVerificationScreen
 import com.example.smartcitizensystem.ui.presentation.main.home.HomeScreen
 import com.example.smartcitizensystem.ui.presentation.main.licences.LicencesScreen
 import com.example.smartcitizensystem.ui.presentation.main.profile.ProfileScreen
@@ -70,10 +72,7 @@ fun MainScreen(
     ) {
         //  Scaffold with TopBar and BottomBar
         Scaffold(
-            containerColor = Color.White, // prevents the area behind/around bottomBar from
-            // falling back to MaterialTheme.colorScheme.background, which is dark in your
-            // app's theme — that's what was showing through the transparent padding around
-            // GlassBottomNavigation and making it look black.
+            containerColor = Color.White,
             topBar = {
                 TopAppBar(
                     title = {
@@ -83,7 +82,6 @@ fun MainScreen(
                             fontWeight = FontWeight.Bold
                         )
                     },
-                    //  Navigation Icon (Hamburger Menu)
                     navigationIcon = {
                         IconButton(
                             onClick = {
@@ -112,7 +110,6 @@ fun MainScreen(
                     )
                 )
             },
-            //  Bottom Navigation Bar (custom glass style)
             bottomBar = {
                 GlassBottomNavigation(
                     navController = bottomNavController,
@@ -129,7 +126,6 @@ fun MainScreen(
                     .fillMaxSize()
             ) {
                 composable(BottomNavItem.Home.route) {
-                    // pass the INNER controller so quick actions switch tabs correctly
                     HomeScreen(navController = bottomNavController)
                 }
                 composable(BottomNavItem.Election.route) {
@@ -139,7 +135,7 @@ fun MainScreen(
                     EmergencyScreen()
                 }
                 composable(BottomNavItem.Profile.route) {
-                    ProfileScreen()
+                    ProfileScreen(navController = bottomNavController)
                 }
                 composable("licences_screen") {
                     LicencesScreen()
@@ -149,6 +145,10 @@ fun MainScreen(
                 }
                 composable("about_screen") {
                     AboutScreen()
+                }
+                // ✅ Add FaceScan to the inner NavHost
+                composable(Screen.FaceScan.route) {
+                    FaceVerificationScreen(navController = bottomNavController)
                 }
             }
         }
@@ -165,6 +165,7 @@ fun getTitleForRoute(route: String?): String {
         "licences_screen" -> "Licences"
         "settings_screen" -> "Settings"
         "about_screen" -> "About"
+        "face_scan_screen" -> "Face Verification"  // ✅ Add this
         else -> "Smart Citizen System"
     }
 }
@@ -172,7 +173,7 @@ fun getTitleForRoute(route: String?): String {
 //  Drawer Content
 @Composable
 fun DrawerContent(
-    navController: NavHostController, // expects the INNER (bottomNavController) instance
+    navController: NavHostController,
     onCloseDrawer: () -> Unit,
     onLogout: () -> Unit
 ) {

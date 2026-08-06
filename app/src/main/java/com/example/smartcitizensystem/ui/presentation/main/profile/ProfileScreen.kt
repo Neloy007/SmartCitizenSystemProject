@@ -26,10 +26,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.smartcitizensystem.data.models.User
 import com.example.smartcitizensystem.data.models.completedItemsCount
 import com.example.smartcitizensystem.data.models.profileCompletion
+import com.example.smartcitizensystem.ui.navigation.Screen
 
 private val AccentColor = Color(0xFF7D7DFF)
 private val AccentSoft = Color(0xFFF7F7FF)
@@ -38,7 +40,8 @@ private val AccentSoft = Color(0xFFF7F7FF)
 @Composable
 fun ProfileScreen(
     modifier: Modifier = Modifier,
-    viewModel: ProfileViewModel = hiltViewModel()
+    viewModel: ProfileViewModel = hiltViewModel(),
+    navController: NavHostController? = null
 ) {
     val user by viewModel.user
     val isLoading by viewModel.isLoading
@@ -118,7 +121,10 @@ fun ProfileScreen(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                             )
                         },
-                        onAddAddressClick = { showAddressDialog = true }
+                        onAddAddressClick = { showAddressDialog = true },
+                        onFaceScanClick = {
+                            navController?.navigate(Screen.FaceScan.route)
+                        }
                     )
                 }
             }
@@ -211,7 +217,8 @@ private fun ProfileContent(
     user: User,
     isUploadingPhoto: Boolean,
     onChangePhotoClick: () -> Unit,
-    onAddAddressClick: () -> Unit
+    onAddAddressClick: () -> Unit,
+    onFaceScanClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -270,7 +277,8 @@ private fun ProfileContent(
                 ComingSoonRow(
                     icon = Icons.Default.Face,
                     title = "Face Scan Verification",
-                    subtitle = "Match your face to your NID photo"
+                    subtitle = "Match your face to your NID photo",
+                    onClick = onFaceScanClick
                 )
             }
         }
@@ -452,11 +460,13 @@ private fun ChecklistRow(
 private fun ComingSoonRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    subtitle: String
+    subtitle: String,
+    onClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -469,10 +479,15 @@ private fun ComingSoonRow(
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
-                .background(Color(0xFFEEEEEE))
+                .background(if (onClick != null) AccentColor else Color(0xFFEEEEEE))
                 .padding(horizontal = 10.dp, vertical = 4.dp)
         ) {
-            Text(text = "Coming Soon", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+            Text(
+                text = if (onClick != null) "Scan Now" else "Coming Soon",
+                fontSize = 11.sp,
+                color = if (onClick != null) Color.White else Color.Gray,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }

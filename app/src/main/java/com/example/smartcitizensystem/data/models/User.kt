@@ -20,7 +20,7 @@ data class User(
 )
 
 /**
- * Profile completion, expressed as 0f..1f.
+ * Profile completion, expressed as 0f 1f.
  *
  * Checks four things a "fully verified" citizen profile needs:
  *  - a profile photo

@@ -10,6 +10,7 @@ import com.example.smartcitizensystem.ui.presentation.main.MainScreen
 import com.example.smartcitizensystem.ui.presentation.splash.SplashScreen
 import com.example.smartcitizensystem.ui.presentation.welcome.WelcomeScreen
 import android.util.Log
+import com.example.smartcitizensystem.ui.presentation.main.facescan.FaceVerificationScreen
 
 private const val TAG = "SetupNavGraph"
 
@@ -85,6 +86,12 @@ fun SetupNavGraph(
             MainScreen(
                 navController = navController,
                 onLogout = onLogout
+            )
+        }
+
+        composable(Screen.FaceScan.route) {
+            FaceVerificationScreen(
+                navController = navController
             )
         }
     }

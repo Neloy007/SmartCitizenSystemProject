@@ -45,6 +45,13 @@ android {
     }
 }
 
+configurations.all {
+    resolutionStrategy {
+        force("com.google.guava:guava:31.1-android")
+        force("com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava")
+    }
+}
+
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(platform(libs.firebase.bom))
@@ -61,8 +68,15 @@ dependencies {
     implementation(libs.firebase.auth.ktx)
     implementation(libs.firebase.firestore.ktx)
     implementation(libs.googleid)
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.androidx.camera.extensions)
+    implementation(libs.guava)
+    implementation(libs.listenablefuture)
+    implementation(libs.play.services.mlkit.face.detection)
     testImplementation(libs.junit)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
@@ -105,6 +119,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
 
     implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // ML Kit Face Detection
 }
 
 kapt {
